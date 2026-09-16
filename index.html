@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CFS Service Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Public+Sans:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="bg-parallax" id="bg-parallax" aria-hidden="true"></div>
+<div class="scroll-progress" id="scroll-progress"></div>
+
+<div class="hero" id="hero">
+  <div class="hero-crest" aria-hidden="true"></div>
+  <div class="hero-inner">
+    <div class="hero-top">
+      <img class="brand-logo" src="cfs-logo.png" alt="Church Farm School">
+      <span class="est-badge">Est. 1918 · Exton, PA</span>
+    </div>
+    <div class="hero-title-row">
+      <div>
+        <p class="hero-eyebrow">Griffins Intranet</p>
+        <h1>Service Center</h1>
+      </div>
+      <div class="hero-actions">
+        <div class="audience-control" role="group" aria-label="View by audience">
+          <span class="aud-indicator" aria-hidden="true"></span>
+          <button class="aud-btn active" data-audience="all" aria-pressed="true">All</button>
+          <button class="aud-btn" data-audience="student" aria-pressed="false">Student</button>
+          <button class="aud-btn" data-audience="faculty" aria-pressed="false">Faculty</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="search-wrap">
+  <div class="search-card">
+    <input id="search" type="search" placeholder="Search tools, docs, and videos…" aria-label="Search resources">
+  </div>
+</div>
+
+<nav class="quick-nav" id="quick-nav" aria-label="Jump to a section"></nav>
+
+<main>
+  <p class="load-note show" id="load-note">Loading…</p>
+  <div id="sections-root"></div>
+  <p class="empty-state" id="empty-state">No resources match your search. Try a different term, or switch the view above.</p>
+</main>
+
+<footer>
+  <div class="footer-inner">
+    <p>Need something added to this page? Contact the <a href="#">IT help desk</a>.</p>
+    <p>Church Farm School Service Center — internal use · <a href="admin.html">Staff sign-in</a></p>
+  </div>
+</footer>
+
+<button id="back-to-top" class="back-to-top" aria-label="Back to top" title="Back to top">↑</button>
+
+<script type="module">
+  import { db } from './firebase-config.js';
+  import {
+    collection, query, orderBy, onSnapshot
+  } from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js';
+
+  const STORAGE_KEY = 'cfs-service-center-audience';
+  let audience = 'all';
+  try { audience = localStorage.getItem(STORAGE_KEY) || 'all'; } catch (e) {}
+
+  const audButtons = document.querySelectorAll('.aud-btn');
+  const audIndicator = document.querySelector('.aud-indicator');
+  const searchInput = document.getElementById('search');
+  const emptyState = document.getElementById('empty-state');
+  const loadNote = document.getElementById('load-note');
+  const quickNav = document.getElementById('quick-nav');
+  const sectionsRoot = document.getElementById('sections-root');
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function moveIndicator(btn) {
+    if (!audIndicator || !btn) return;
+    audIndicator.style.left = btn.offsetLeft + 'px';
+    audIndicator.style.width = btn.offsetWidth + 'px';
+  }
+
+  function setAudience(value) {
+    audience = value;
+    try { localStorage.setItem(STORAGE_KEY, value); } catch (e) {}
+    let activeBtn = null;
+    audButtons.forEach(btn => {
+      const active = btn.dataset.audience === value;
+      btn.classList.toggle('active', active);
+      btn.setAttribute('aria-pressed', String(active));
+      if (active) activeBtn = btn;
+    });
+    moveIndicator(activeBtn);
+    applyFilters();
+  }
+
+  function applyFilters() {
+    const query_ = searchInput.value.trim().toLowerCase();
+    let anyVisible = false;
+    document.querySelectorAll('[data-section]').forEach(section => {
+      let sectionHasVisible = false;
+      section.querySelectorAll('.card').forEach(card => {
+        const cardAudience = card.dataset.audience;
+        const audienceMatch = audience === 'all' || cardAudience === 'all' || cardAudience === audience;
+        const text = card.textContent.toLowerCase();
+        const searchMatch = query_ === '' || text.includes(query_);
+        const visible = audienceMatch && searchMatch;
+        card.style.display = visible ? '' : 'none';
+        if (visible) sectionHasVisible = true;
+      });
+      section.style.display = sectionHasVisible ? '' : 'none';
+      if (sectionHasVisible) anyVisible = true;
+    });
+    emptyState.classList.toggle('show', !anyVisible && sectionsRoot.children.length > 0);
+  }
+
+  audButtons.forEach(btn => {
+    btn.addEventListener('click', () => setAudience(btn.dataset.audience));
+  });
+  searchInput.addEventListener('input', applyFilters);
+  window.addEventListener('resize', () => {
+    moveIndicator(document.querySelector('.aud-btn.active'));
+  });
+
+  // back-to-top
+  const backToTop = document.getElementById('back-to-top');
+  if (backToTop) {
+    window.addEventListener('scroll', () => {
+      backToTop.classList.toggle('show', window.scrollY > 480);
+    }, { passive: true });
+    backToTop.addEventListener('click', () => {
+      window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
+    });
+  }
+
+  // parallax background + hero pan + scroll progress
+  const bgParallax = document.getElementById('bg-parallax');
+  const heroEl = document.getElementById('hero');
+  const scrollProgress = document.getElementById('scroll-progress');
+  let ticking = false;
+  function updateScrollEffects() {
+    const scrollY = window.scrollY;
+    if (bgParallax && !reduceMotion) {
+      bgParallax.style.backgroundPosition = `center ${-(scrollY * 0.18)}px`;
+    }
+    if (heroEl && !reduceMotion) {
+      const pan = 55 + Math.min(scrollY * 0.03, 15);
+      heroEl.style.backgroundPosition = `center ${pan}%`;
+    }
+    if (scrollProgress) {
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      const pct = max > 0 ? (scrollY / max) * 100 : 0;
+      scrollProgress.style.width = pct + '%';
+    }
+    ticking = false;
+  }
+  window.addEventListener('scroll', () => {
+    if (!ticking) { requestAnimationFrame(updateScrollEffects); ticking = true; }
+  }, { passive: true });
+  updateScrollEffects();
+
+  // ---------- render from Firestore ----------
+  function escapeHtml(str) {
+    return String(str == null ? '' : str).replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+  }
+  function normalizeUrl(raw) {
+    const v = (raw || '').trim();
+    if (!v || v === '#') return '#';
+    if (/^javascript:/i.test(v)) return '#';
+    if (/^(https?:|mailto:|tel:)/i.test(v)) return v;
+    return 'https://' + v.replace(/^\/+/, '');
+  }
+
+  let navObserver = null;
+  function setupNavObserver() {
+    if (navObserver) navObserver.disconnect();
+    const links = document.querySelectorAll('.quick-link');
+    const sections = document.querySelectorAll('[data-section]');
+    if (!('IntersectionObserver' in window) || !links.length) return;
+    navObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        const id = entry.target.id;
+        links.forEach(link => link.classList.toggle('active', link.dataset.target === id));
+      });
+    }, { rootMargin: '-45% 0px -50% 0px' });
+    sections.forEach(section => navObserver.observe(section));
+  }
+
+  function cardHTML(d) {
+    const aud = d.audience === 'student' || d.audience === 'faculty' ? d.audience : 'all';
+    const tagHTML = aud !== 'all'
+      ? `<span class="tag tag-${aud}">${aud === 'student' ? 'Student' : 'Faculty'}</span>` : '';
+    const href = normalizeUrl(d.url);
+    return `<a class="card" href="${escapeHtml(href)}" data-audience="${aud}" target="_blank" rel="noopener noreferrer">
+        <div class="card-top"><span class="card-icon" aria-hidden="true">${escapeHtml(d.icon || '🔗')}</span>${tagHTML}</div>
+        <h3>${escapeHtml(d.title || 'Untitled link')}</h3>
+        <p>${escapeHtml(d.description || '')}</p>
+      </a>`;
+  }
+
+  let sectionsData = [];
+  let cardsBySection = {};
+  let sectionsLoaded = false, cardsLoaded = false;
+
+  function render() {
+    if (!sectionsLoaded || !cardsLoaded) return;
+    loadNote.classList.remove('show');
+
+    if (!sectionsData.length) {
+      quickNav.innerHTML = '';
+      sectionsRoot.innerHTML = '';
+      emptyState.classList.remove('show');
+      loadNote.textContent = 'Nothing here yet — sign in as staff to add the first section.';
+      loadNote.classList.add('show');
+      return;
+    }
+
+    quickNav.innerHTML = sectionsData.map(s => `
+      <a class="quick-link" href="#${s.id}" data-target="${s.id}">
+        <span aria-hidden="true">${escapeHtml(s.icon || '🔗')}</span>${escapeHtml(s.name)}
+      </a>`).join('');
+
+    sectionsRoot.innerHTML = sectionsData.map(s => `
+      <section class="category" id="${escapeHtml(s.id)}" data-section>
+        <h2><span class="cat-badge" aria-hidden="true">${escapeHtml(s.icon || '🔗')}</span> ${escapeHtml(s.name)}</h2>
+        <div class="card-grid">
+          ${(cardsBySection[s.id] || []).map(cardHTML).join('') || '<p style="color:var(--text-muted); font-size:.88rem;">No links in this section yet.</p>'}
+        </div>
+      </section>`).join('');
+
+    applyFilters();
+    setupNavObserver();
+  }
+
+  const sectionsQuery = query(collection(db, 'sections'), orderBy('order'));
+  onSnapshot(sectionsQuery, (snap) => {
+    sectionsData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    sectionsLoaded = true;
+    render();
+  }, (err) => {
+    console.error('sections snapshot error', err);
+    loadNote.textContent = "Couldn't load this page's content right now. Try refreshing.";
+    loadNote.classList.add('show');
+  });
+
+  const cardsQuery = query(collection(db, 'cards'), orderBy('order'));
+  onSnapshot(cardsQuery, (snap) => {
+    const grouped = {};
+    snap.docs.forEach(d => {
+      const c = d.data();
+      const sid = c.sectionId;
+      if (!grouped[sid]) grouped[sid] = [];
+      grouped[sid].push({ id: d.id, ...c });
+    });
+    cardsBySection = grouped;
+    cardsLoaded = true;
+    render();
+  }, (err) => {
+    console.error('cards snapshot error', err);
+  });
+
+  setTimeout(() => {
+    if (!sectionsLoaded || !cardsLoaded) {
+      loadNote.textContent = "This is taking longer than expected — check your connection, or the site may not be set up yet.";
+      loadNote.classList.add('show');
+    }
+  }, 8000);
+
+  setAudience(audience);
+</script>
+</body>
+</html>
