@@ -30,11 +30,6 @@
   </div>
 
   <main class="admin-main">
-    <div class="seed-banner" id="seed-banner" hidden>
-      <p>This site has no sections yet. Load the same starter content that was used while designing it?</p>
-      <button class="btn-primary" id="seed-btn" type="button">Load Example Content</button>
-    </div>
-
     <!-- Sections -->
     <div class="admin-section-block">
       <h2>Sections</h2>
@@ -80,8 +75,6 @@
   const adminShell = document.getElementById('admin-shell');
   const whoLabel = document.getElementById('who-label');
   const signOutBtn = document.getElementById('sign-out-btn');
-  const seedBanner = document.getElementById('seed-banner');
-  const seedBtn = document.getElementById('seed-btn');
   const sectionsList = document.getElementById('sections-list');
   const addSectionForm = document.getElementById('add-section-form');
   const cardsBySectionEl = document.getElementById('cards-by-section');
@@ -155,7 +148,6 @@
     const sectionsQuery = query(collection(db, 'sections'), orderBy('order'));
     unsubSections = onSnapshot(sectionsQuery, (snap) => {
       sections = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      seedBanner.hidden = sections.length > 0;
       renderSections();
       renderCards();
     });
@@ -420,60 +412,6 @@
     });
   }
 
-  // ---------- one-click starter content ----------
-  seedBtn.addEventListener('click', async () => {
-    seedBtn.disabled = true;
-    seedBtn.textContent = 'Loading…';
-    const sectionDefs = [
-      { name: 'IT & Tech Support', icon: '🖥️', cards: [
-        { title: 'Reset Your Password', description: 'Self-service portal for resetting your CFS network and email password.', icon: '🔑', audience: 'all' },
-        { title: 'Connect to Wi-Fi', description: 'Step-by-step setup for campus Wi-Fi on laptops, phones, and tablets.', icon: '📶', audience: 'all' },
-        { title: 'Submit a Help Desk Ticket', description: 'Report a tech issue or request equipment — tracked by the IT team.', icon: '🎫', audience: 'all' },
-        { title: 'Classroom Printer & AV Guide', description: 'Loading paper, pairing projectors, and booking the AV cart for your room.', icon: '🖨️', audience: 'faculty' },
-      ]},
-      { name: 'Academics', icon: '📚', cards: [
-        { title: 'Learning Management System', description: 'Log in to see coursework, assignments, and class announcements.', icon: '🎓', audience: 'all' },
-        { title: 'Check Your Grades', description: 'View current grades, missing work, and teacher comments.', icon: '📝', audience: 'student' },
-        { title: 'Gradebook & Attendance', description: 'Enter grades, take attendance, and run progress reports.', icon: '🗂️', audience: 'faculty' },
-        { title: 'Library Catalog', description: "Search the library's books, databases, and study room bookings.", icon: '📖', audience: 'all' },
-      ]},
-      { name: 'Farm & Grounds', icon: '🚜', cards: [
-        { title: 'Field & Barn Safety Guidelines', description: 'Rules for anyone working around livestock, equipment, and machinery.', icon: '⚠️', audience: 'all' },
-        { title: 'Chore Schedule', description: "This week's barn, garden, and grounds crew assignments.", icon: '✅', audience: 'student' },
-        { title: 'Tractor & Equipment Training', description: 'Required video certification before operating farm equipment with students.', icon: '🎥', audience: 'faculty' },
-      ]},
-      { name: 'Policies & Handbooks', icon: '📋', cards: [
-        { title: 'Student Handbook', description: 'Dress code, dorm life, and community expectations.', icon: '📕', audience: 'student' },
-        { title: 'Faculty & Staff Handbook', description: 'HR policies, leave requests, and residential duty procedures.', icon: '📘', audience: 'faculty' },
-        { title: 'Emergency & Fire Drill Procedures', description: 'What to do and where to go during drills and real emergencies.', icon: '🔥', audience: 'all' },
-        { title: 'New Employee Onboarding', description: 'Everything a new hire needs in their first two weeks.', icon: '🆕', audience: 'faculty' },
-      ]},
-      { name: 'Quick Links', icon: '🔗', cards: [
-        { title: 'School Calendar', description: 'Athletics, chapel, breaks, and campus-wide events.', icon: '📅', audience: 'all' },
-        { title: 'Staff Directory', description: 'Find contact info and office hours for faculty and staff.', icon: '👥', audience: 'all' },
-        { title: 'Facilities Request Form', description: 'Report a maintenance issue or request room setup for an event.', icon: '🧰', audience: 'faculty' },
-      ]},
-    ];
-    try {
-      let sOrder = 10;
-      for (const s of sectionDefs) {
-        const sRef = await addDoc(collection(db, 'sections'), { name: s.name, icon: s.icon, order: sOrder });
-        sOrder += 10;
-        let cOrder = 10;
-        for (const c of s.cards) {
-          await addDoc(collection(db, 'cards'), { ...c, url: '#', sectionId: sRef.id, order: cOrder });
-          cOrder += 10;
-        }
-      }
-      showToast('Starter content loaded.');
-    } catch (err) {
-      console.error(err);
-      showToast('Could not load starter content.', true);
-    } finally {
-      seedBtn.disabled = false;
-      seedBtn.textContent = 'Load Example Content';
-    }
-  });
 </script>
 </body>
 </html>
