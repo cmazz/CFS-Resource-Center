@@ -284,11 +284,11 @@
       // Embed HTML is intentionally NOT escaped — it's meant to render as markup
       // (an iframe, a widget snippet). Only signed-in admins can write cards at
       // all, so this trusts the same people who already control every link here.
-      // Rendered as its own full-width block, outside the card grid entirely —
-      // embeds often carry a fixed intrinsic width that a grid cell can't
-      // reliably contain.
+      // No card chrome here on purpose — just the widget itself, full width,
+      // outside the card grid entirely (embeds often carry a fixed intrinsic
+      // width that a grid cell can't reliably contain). The title is admin-only
+      // (shown in the admin list to identify it), not rendered on the public page.
       return `<div class="card embed-block" data-audience="${aud}">
-          <div class="card-top"><h3>${escapeHtml(d.title || 'Untitled embed')}</h3>${tagHTML}</div>
           <div class="embed-body">${d.embedCode || ''}</div>
         </div>`;
     }
