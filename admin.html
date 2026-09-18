@@ -266,10 +266,10 @@
           <div class="card-admin-list">
             ${cards.length ? cards.map((c, i) => `
               <div class="card-admin-row" ${c.hidden ? 'style="opacity:.55;"' : ''}>
-                <span class="ca-icon">${escapeHtml(c.icon || '🔗')}</span>
+                <span class="ca-icon">${c.type === 'embed' ? '🧩' : escapeHtml(c.icon || '🔗')}</span>
                 <div class="ca-body">
-                  <div class="ca-title">${escapeHtml(c.title || 'Untitled')} ${c.audience && c.audience !== 'all' ? `<span class="tag tag-${c.audience}">${c.audience}</span>` : ''} ${c.hidden ? '<span class="tag" style="background:var(--surface-2); color:var(--text-muted);">Hidden</span>' : ''}</div>
-                  <div class="ca-meta">${escapeHtml(c.url || '')}</div>
+                  <div class="ca-title">${escapeHtml(c.title || 'Untitled')} ${c.type === 'embed' ? '<span class="tag" style="background:var(--gold-soft); color:var(--gold-deep);">Embed</span>' : ''} ${c.audience && c.audience !== 'all' ? `<span class="tag tag-${c.audience}">${c.audience}</span>` : ''} ${c.hidden ? '<span class="tag" style="background:var(--surface-2); color:var(--text-muted);">Hidden</span>' : ''}</div>
+                  <div class="ca-meta">${c.type === 'embed' ? 'HTML embed' : escapeHtml(c.url || '')}</div>
                 </div>
                 <div class="row-actions">
                   <button class="icon-btn" data-act="card-toggle-visible" data-id="${c.id}" data-hidden="${c.hidden ? '1' : '0'}" title="${c.hidden ? 'Show on site' : 'Hide from site'}">${c.hidden ? '🙈' : '👁'}</button>
@@ -338,35 +338,45 @@
     const overlay = document.createElement('div');
     overlay.className = 'signin-wrap';
     overlay.style.cssText = 'position:fixed; inset:0; background:rgba(20,14,10,.55); z-index:50; min-height:100vh;';
+    const existingType = existing?.type === 'embed' ? 'embed' : 'link';
     overlay.innerHTML = `
-      <form class="signin-card" style="text-align:left; max-width:440px;">
+      <form class="signin-card" style="text-align:left; max-width:480px;">
         <h1 style="font-size:1.4rem;">${mode === 'edit' ? 'Edit Card' : 'Add Card'}</h1>
+        <div class="form-mode-toggle">
+          <button type="button" data-mode="link" class="${existingType === 'link' ? 'active' : ''}">Link</button>
+          <button type="button" data-mode="embed" class="${existingType === 'embed' ? 'active' : ''}">HTML Embed</button>
+        </div>
         <div class="field">
           <label>Title</label>
           <input name="title" required maxlength="80" value="${escapeHtml(existing?.title || '')}">
         </div>
-        <div class="field">
+        <div class="field" data-field="link-only">
           <label>Description</label>
           <textarea name="description" maxlength="200">${escapeHtml(existing?.description || '')}</textarea>
         </div>
-        <div class="field">
+        <div class="field" data-field="link-only">
           <label>URL</label>
           <input name="url" placeholder="https://" value="${escapeHtml(existing?.url || '')}">
         </div>
-        <p class="field-hint">For a PDF or document: upload it to Google Drive, set sharing to "Anyone with the link," and paste that link here.</p>
-        <div class="field-row">
+        <p class="field-hint" data-field="link-only">For a PDF or document: upload it to Google Drive, set sharing to "Anyone with the link," and paste that link here.</p>
+        <div class="field-row" data-field="link-only">
           <div class="field" style="flex:0 0 90px;">
             <label>Icon</label>
             <input name="icon" maxlength="4" placeholder="🔗" value="${escapeHtml(existing?.icon || '')}">
           </div>
-          <div class="field">
-            <label>Visible to</label>
-            <select name="audience">
-              <option value="all">Everyone</option>
-              <option value="student">Students only</option>
-              <option value="faculty">Faculty only</option>
-            </select>
-          </div>
+        </div>
+        <div class="field" data-field="embed-only" hidden>
+          <label>Embed code</label>
+          <textarea name="embedCode" class="code" placeholder="&lt;iframe src=&quot;https://...&quot;&gt;&lt;/iframe&gt;">${escapeHtml(existing?.embedCode || '')}</textarea>
+        </div>
+        <p class="field-hint" data-field="embed-only" hidden>Paste the embed/iframe code a widget or video provider gives you (e.g. a weather station widget, a YouTube "Share → Embed" snippet). Only add embeds from providers you trust — this renders exactly as given, so it can include the provider's own scripts.</p>
+        <div class="field">
+          <label>Visible to</label>
+          <select name="audience">
+            <option value="all">Everyone</option>
+            <option value="student">Students only</option>
+            <option value="faculty">Faculty only</option>
+          </select>
         </div>
         <div style="display:flex; justify-content:flex-end; gap:.6rem; margin-top:.6rem;">
           <button type="button" class="btn-ghost" data-act="cancel">Cancel</button>
@@ -378,6 +388,21 @@
     const form = overlay.querySelector('form');
     if (existing?.audience) form.audience.value = existing.audience;
 
+    let cardType = existingType;
+    function applyTypeVisibility() {
+      overlay.querySelectorAll('[data-field="link-only"]').forEach(el => el.hidden = cardType !== 'link');
+      overlay.querySelectorAll('[data-field="embed-only"]').forEach(el => el.hidden = cardType !== 'embed');
+    }
+    applyTypeVisibility();
+    overlay.querySelectorAll('.form-mode-toggle button').forEach(btn => {
+      btn.onclick = () => {
+        overlay.querySelectorAll('.form-mode-toggle button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        cardType = btn.dataset.mode;
+        applyTypeVisibility();
+      };
+    });
+
     overlay.querySelector('[data-act="cancel"]').onclick = () => overlay.remove();
     overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
 
@@ -386,14 +411,24 @@
       const submitBtn = form.querySelector('button[type="submit"]');
       submitBtn.disabled = true;
       try {
-        const url = form.url.value.trim();
-        const payload = {
-          title: form.title.value.trim().slice(0, 80) || 'Untitled link',
-          description: form.description.value.trim().slice(0, 200),
-          url: url || '#',
-          icon: form.icon.value.trim().slice(0, 4) || '🔗',
-          audience: form.audience.value,
-        };
+        const title = form.title.value.trim().slice(0, 80) || (cardType === 'embed' ? 'Untitled embed' : 'Untitled link');
+        const payload = cardType === 'embed'
+          ? {
+              type: 'embed',
+              title,
+              embedCode: form.embedCode.value.trim().slice(0, 5000),
+              audience: form.audience.value,
+              description: '', url: '', icon: '',
+            }
+          : {
+              type: 'link',
+              title,
+              description: form.description.value.trim().slice(0, 200),
+              url: form.url.value.trim() || '#',
+              icon: form.icon.value.trim().slice(0, 4) || '🔗',
+              audience: form.audience.value,
+              embedCode: '',
+            };
         if (mode === 'create') {
           const list = cardsBySection[sectionId] || [];
           const maxOrder = list.reduce((m, c) => Math.max(m, c.order || 0), 0);

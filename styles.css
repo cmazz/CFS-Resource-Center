@@ -166,6 +166,13 @@ html{scroll-behavior:smooth;}
   letter-spacing:.01em;
 }
 .hero-actions{display:flex; align-items:center; gap:.8rem; flex-wrap:wrap;}
+.auth-status{
+  font-family:"Barlow Semi Condensed", sans-serif;
+  font-size:.78rem;
+  color:rgba(255,255,255,.65);
+}
+.auth-status a{color:var(--gold); text-decoration:none;}
+.auth-status a:hover{text-decoration:underline;}
 
 .audience-control{
   position:relative;
@@ -344,6 +351,21 @@ main{max-width:1100px; margin:0 auto; padding:2.2rem 1.5rem 3rem;}
 .card-top{display:flex; align-items:flex-start; justify-content:space-between; gap:.5rem;}
 .card h3{font-size:1.02rem; font-weight:600; font-family:"Public Sans", sans-serif;}
 .card p{margin:0; font-size:.88rem; color:var(--text-muted); flex:1;}
+
+.card-embed{
+  grid-column:1 / -1;
+  cursor:default;
+}
+.card-embed:hover{transform:none; border-top-color:transparent; box-shadow:var(--shadow);}
+.card-embed .embed-body{
+  border-radius:.4rem;
+  overflow:hidden;
+}
+.card-embed .embed-body iframe,
+.card-embed .embed-body img,
+.card-embed .embed-body video{
+  max-width:100%;
+}
 
 .tag{
   font-family:"Barlow Semi Condensed", sans-serif;
@@ -567,8 +589,8 @@ footer a:hover{text-decoration:underline;}
 .field-row .field{flex:1; min-width:160px;}
 .field-hint{font-size:.76rem; color:var(--text-muted); margin-top:-.4rem; margin-bottom:.9rem;}
 
-.url-mode-toggle{display:flex; gap:.4rem; margin-bottom:.6rem;}
-.url-mode-toggle button{
+.form-mode-toggle{display:flex; gap:.4rem; margin-bottom:.6rem;}
+.form-mode-toggle button{
   flex:1;
   font-family:"Barlow Semi Condensed", sans-serif;
   font-weight:700; text-transform:uppercase; font-size:.76rem; letter-spacing:.03em;
@@ -579,7 +601,8 @@ footer a:hover{text-decoration:underline;}
   color:var(--text-muted);
   cursor:pointer;
 }
-.url-mode-toggle button.active{border-color:var(--gold); color:var(--heading); background:var(--gold-soft);}
+.form-mode-toggle button.active{border-color:var(--gold); color:var(--heading); background:var(--gold-soft);}
+.field textarea.code{font-family:ui-monospace, "SF Mono", Consolas, monospace; font-size:.82rem; min-height:8rem;}
 
 .btn-primary, .btn-ghost, .btn-danger{
   font-family:"Barlow Semi Condensed", sans-serif;

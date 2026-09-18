@@ -279,6 +279,17 @@
     const aud = d.audience === 'student' || d.audience === 'faculty' ? d.audience : 'all';
     const tagHTML = aud !== 'all'
       ? `<span class="tag tag-${aud}">${aud === 'student' ? 'Student' : 'Faculty'}</span>` : '';
+
+    if (d.type === 'embed') {
+      // Embed HTML is intentionally NOT escaped — it's meant to render as markup
+      // (an iframe, a widget snippet). Only signed-in admins can write cards at
+      // all, so this trusts the same people who already control every link here.
+      return `<div class="card card-embed" data-audience="${aud}">
+          <div class="card-top"><h3>${escapeHtml(d.title || 'Untitled embed')}</h3>${tagHTML}</div>
+          <div class="embed-body">${d.embedCode || ''}</div>
+        </div>`;
+    }
+
     const href = normalizeUrl(d.url);
     return `<a class="card" href="${escapeHtml(href)}" data-audience="${aud}" target="_blank" rel="noopener noreferrer">
         <div class="card-top"><span class="card-icon" aria-hidden="true">${escapeHtml(d.icon || '🔗')}</span>${tagHTML}</div>
