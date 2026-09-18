@@ -273,13 +273,14 @@
           </div>
           <div class="card-admin-list">
             ${cards.length ? cards.map((c, i) => `
-              <div class="card-admin-row">
+              <div class="card-admin-row" ${c.hidden ? 'style="opacity:.55;"' : ''}>
                 <span class="ca-icon">${escapeHtml(c.icon || '🔗')}</span>
                 <div class="ca-body">
-                  <div class="ca-title">${escapeHtml(c.title || 'Untitled')} ${c.audience && c.audience !== 'all' ? `<span class="tag tag-${c.audience}">${c.audience}</span>` : ''}</div>
+                  <div class="ca-title">${escapeHtml(c.title || 'Untitled')} ${c.audience && c.audience !== 'all' ? `<span class="tag tag-${c.audience}">${c.audience}</span>` : ''} ${c.hidden ? '<span class="tag" style="background:var(--surface-2); color:var(--text-muted);">Hidden</span>' : ''}</div>
                   <div class="ca-meta">${escapeHtml(c.url || '')}</div>
                 </div>
                 <div class="row-actions">
+                  <button class="icon-btn" data-act="card-toggle-visible" data-id="${c.id}" data-hidden="${c.hidden ? '1' : '0'}" title="${c.hidden ? 'Show on site' : 'Hide from site'}">${c.hidden ? '🙈' : '👁'}</button>
                   <button class="icon-btn" data-act="card-up" data-id="${c.id}" data-section="${s.id}" ${i === 0 ? 'disabled' : ''} title="Move up">↑</button>
                   <button class="icon-btn" data-act="card-down" data-id="${c.id}" data-section="${s.id}" ${i === cards.length - 1 ? 'disabled' : ''} title="Move down">↓</button>
                   <button class="icon-btn" data-act="card-edit" data-id="${c.id}" title="Edit">✎</button>
@@ -295,6 +296,16 @@
     cardsBySectionEl.querySelectorAll('[data-act="card-delete"]').forEach(b => b.onclick = () => deleteCard(b.dataset.id));
     cardsBySectionEl.querySelectorAll('[data-act="card-up"]').forEach(b => b.onclick = () => moveCard(b.dataset.id, b.dataset.section, -1));
     cardsBySectionEl.querySelectorAll('[data-act="card-down"]').forEach(b => b.onclick = () => moveCard(b.dataset.id, b.dataset.section, 1));
+    cardsBySectionEl.querySelectorAll('[data-act="card-toggle-visible"]').forEach(b => b.onclick = () => toggleCardVisibility(b.dataset.id, b.dataset.hidden === '1'));
+  }
+
+  async function toggleCardVisibility(id, currentlyHidden) {
+    try {
+      await updateDoc(doc(db, 'cards', id), { hidden: !currentlyHidden });
+      showToast(currentlyHidden ? 'Card is now visible on the site.' : 'Card hidden from the site.');
+    } catch (err) {
+      showToast('Could not change visibility.', true);
+    }
   }
 
   async function moveCard(id, sectionId, dir) {

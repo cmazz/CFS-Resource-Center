@@ -33,6 +33,7 @@
           <button class="aud-btn" data-audience="student" aria-pressed="false">Student</button>
           <button class="aud-btn" data-audience="faculty" aria-pressed="false">Faculty</button>
         </div>
+        <div class="auth-status" id="auth-status" hidden></div>
       </div>
     </div>
   </div>
@@ -61,11 +62,16 @@
 
 <button id="back-to-top" class="back-to-top" aria-label="Back to top" title="Back to top">↑</button>
 
+<div class="toast" id="toast"></div>
+
 <script type="module">
-  import { db } from './firebase-config.js';
+  import { db, auth } from './firebase-config.js';
   import {
-    collection, query, orderBy, onSnapshot
+    collection, query, orderBy, onSnapshot, doc, getDoc
   } from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js';
+  import {
+    GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
+  } from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js';
 
   const STORAGE_KEY = 'cfs-service-center-audience';
   let audience = 'all';
@@ -120,12 +126,86 @@
     emptyState.classList.toggle('show', !anyVisible && sectionsRoot.children.length > 0);
   }
 
+  const toast = document.getElementById('toast');
+  let toastTimer = null;
+  function showToast(msg, isError) {
+    toast.textContent = msg;
+    toast.classList.toggle('toast-error', !!isError);
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 3200);
+  }
+
+  // ---------- faculty gate ----------
+  const authStatus = document.getElementById('auth-status');
+  let currentUser = null;
+  let verifiedFaculty = false;
+
+  async function checkFaculty(user) {
+    try {
+      const snap = await getDoc(doc(db, 'faculty', user.email));
+      if (snap.exists()) return true;
+    } catch (e) { /* not on the list — fall through */ }
+    try {
+      const adminSnap = await getDoc(doc(db, 'admins', user.email));
+      return adminSnap.exists();
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function renderAuthStatus() {
+    if (currentUser) {
+      authStatus.hidden = false;
+      authStatus.innerHTML = `${verifiedFaculty ? 'Faculty: ' : ''}${escapeHtml(currentUser.email)} · <a href="#" id="sign-out-link">Sign out</a>`;
+      document.getElementById('sign-out-link').addEventListener('click', (e) => {
+        e.preventDefault();
+        signOut(auth);
+      });
+    } else {
+      authStatus.hidden = true;
+      authStatus.innerHTML = '';
+    }
+  }
+
   audButtons.forEach(btn => {
-    btn.addEventListener('click', () => setAudience(btn.dataset.audience));
+    btn.addEventListener('click', async () => {
+      const value = btn.dataset.audience;
+      if (value !== 'faculty') { setAudience(value); return; }
+
+      if (verifiedFaculty) { setAudience('faculty'); return; }
+
+      if (!currentUser) {
+        try {
+          const result = await signInWithPopup(auth, new GoogleAuthProvider());
+          currentUser = result.user;
+        } catch (err) {
+          console.error(err);
+          showToast('Sign-in failed — please try again.', true);
+          return;
+        }
+      }
+      verifiedFaculty = await checkFaculty(currentUser);
+      renderAuthStatus();
+      if (verifiedFaculty) {
+        subscribeCards();
+        setAudience('faculty');
+      } else {
+        showToast("This account doesn't have faculty access.", true);
+      }
+    });
   });
   searchInput.addEventListener('input', applyFilters);
   window.addEventListener('resize', () => {
     moveIndicator(document.querySelector('.aud-btn.active'));
+  });
+
+  onAuthStateChanged(auth, async (user) => {
+    currentUser = user;
+    verifiedFaculty = user ? await checkFaculty(user) : false;
+    renderAuthStatus();
+    subscribeCards();
+    if (!user && audience === 'faculty') setAudience('all');
   });
 
   // back-to-top
@@ -233,7 +313,7 @@
       <section class="category" id="${escapeHtml(s.id)}" data-section>
         <h2><span class="cat-badge" aria-hidden="true">${escapeHtml(s.icon || '🔗')}</span> ${escapeHtml(s.name)}</h2>
         <div class="card-grid">
-          ${(cardsBySection[s.id] || []).map(cardHTML).join('') || '<p style="color:var(--text-muted); font-size:.88rem;">No links in this section yet.</p>'}
+          ${(cardsBySection[s.id] || []).filter(d => !d.hidden).map(cardHTML).join('') || '<p style="color:var(--text-muted); font-size:.88rem;">No links in this section yet.</p>'}
         </div>
       </section>`).join('');
 
@@ -252,21 +332,28 @@
     loadNote.classList.add('show');
   });
 
-  const cardsQuery = query(collection(db, 'cards'), orderBy('order'));
-  onSnapshot(cardsQuery, (snap) => {
-    const grouped = {};
-    snap.docs.forEach(d => {
-      const c = d.data();
-      const sid = c.sectionId;
-      if (!grouped[sid]) grouped[sid] = [];
-      grouped[sid].push({ id: d.id, ...c });
+  // Re-run whenever auth state changes (sign in/out) so Firestore re-evaluates
+  // which cards this viewer is allowed to see — a faculty-only card only ever
+  // reaches the browser once the signed-in, allowlisted request is in place.
+  let unsubCards = null;
+  function subscribeCards() {
+    if (unsubCards) { unsubCards(); unsubCards = null; }
+    const cardsQuery = query(collection(db, 'cards'), orderBy('order'));
+    unsubCards = onSnapshot(cardsQuery, (snap) => {
+      const grouped = {};
+      snap.docs.forEach(d => {
+        const c = d.data();
+        const sid = c.sectionId;
+        if (!grouped[sid]) grouped[sid] = [];
+        grouped[sid].push({ id: d.id, ...c });
+      });
+      cardsBySection = grouped;
+      cardsLoaded = true;
+      render();
+    }, (err) => {
+      console.error('cards snapshot error', err);
     });
-    cardsBySection = grouped;
-    cardsLoaded = true;
-    render();
-  }, (err) => {
-    console.error('cards snapshot error', err);
-  });
+  }
 
   setTimeout(() => {
     if (!sectionsLoaded || !cardsLoaded) {
