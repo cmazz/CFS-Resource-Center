@@ -284,7 +284,10 @@
       // Embed HTML is intentionally NOT escaped — it's meant to render as markup
       // (an iframe, a widget snippet). Only signed-in admins can write cards at
       // all, so this trusts the same people who already control every link here.
-      return `<div class="card card-embed" data-audience="${aud}">
+      // Rendered as its own full-width block, outside the card grid entirely —
+      // embeds often carry a fixed intrinsic width that a grid cell can't
+      // reliably contain.
+      return `<div class="card embed-block" data-audience="${aud}">
           <div class="card-top"><h3>${escapeHtml(d.title || 'Untitled embed')}</h3>${tagHTML}</div>
           <div class="embed-body">${d.embedCode || ''}</div>
         </div>`;
@@ -301,6 +304,33 @@
   let sectionsData = [];
   let cardsBySection = {};
   let sectionsLoaded = false, cardsLoaded = false;
+
+  // Consecutive link-cards share one grid; each embed breaks out as its own
+  // full-width block, in whatever order the admin arranged them.
+  function sectionBodyHTML(items) {
+    const visible = items.filter(d => !d.hidden);
+    if (!visible.length) {
+      return '<p style="color:var(--text-muted); font-size:.88rem;">No links in this section yet.</p>';
+    }
+    let html = '';
+    let gridBuffer = [];
+    function flushGrid() {
+      if (gridBuffer.length) {
+        html += `<div class="card-grid">${gridBuffer.map(cardHTML).join('')}</div>`;
+        gridBuffer = [];
+      }
+    }
+    visible.forEach(d => {
+      if (d.type === 'embed') {
+        flushGrid();
+        html += cardHTML(d);
+      } else {
+        gridBuffer.push(d);
+      }
+    });
+    flushGrid();
+    return html;
+  }
 
   function render() {
     if (!sectionsLoaded || !cardsLoaded) return;
@@ -323,10 +353,20 @@
     sectionsRoot.innerHTML = sectionsData.map(s => `
       <section class="category" id="${escapeHtml(s.id)}" data-section>
         <h2><span class="cat-badge" aria-hidden="true">${escapeHtml(s.icon || '🔗')}</span> ${escapeHtml(s.name)}</h2>
-        <div class="card-grid">
-          ${(cardsBySection[s.id] || []).filter(d => !d.hidden).map(cardHTML).join('') || '<p style="color:var(--text-muted); font-size:.88rem;">No links in this section yet.</p>'}
-        </div>
+        ${sectionBodyHTML(cardsBySection[s.id] || [])}
       </section>`).join('');
+
+    // Belt-and-suspenders containment for embed widgets: set width caps as
+    // inline styles (always wins the cascade, no matter what markup a
+    // third-party embed snippet brings with it) so a wide iframe/table/image
+    // can never push past its card and break the page layout.
+    document.querySelectorAll('.embed-body').forEach(body => {
+      body.style.overflowX = 'auto';
+      body.style.maxWidth = '100%';
+      body.querySelectorAll('iframe, img, video, object, embed, table').forEach(el => {
+        el.style.maxWidth = '100%';
+      });
+    });
 
     applyFilters();
     setupNavObserver();

@@ -352,18 +352,27 @@ main{max-width:1100px; margin:0 auto; padding:2.2rem 1.5rem 3rem;}
 .card h3{font-size:1.02rem; font-weight:600; font-family:"Public Sans", sans-serif;}
 .card p{margin:0; font-size:.88rem; color:var(--text-muted); flex:1;}
 
-.card-embed{
-  grid-column:1 / -1;
+.embed-block{
+  width:100%;
+  max-width:100%;
+  box-sizing:border-box;
+  margin-bottom:1rem;
   cursor:default;
 }
-.card-embed:hover{transform:none; border-top-color:transparent; box-shadow:var(--shadow);}
-.card-embed .embed-body{
+.embed-block:last-child{margin-bottom:0;}
+.embed-block:hover{transform:none; border-top-color:transparent; box-shadow:var(--shadow);}
+.embed-block .embed-body{
   border-radius:.4rem;
-  overflow:hidden;
+  overflow-x:auto;
+  overflow-y:hidden;
+  max-width:100%;
 }
-.card-embed .embed-body iframe,
-.card-embed .embed-body img,
-.card-embed .embed-body video{
+.embed-block .embed-body iframe,
+.embed-block .embed-body img,
+.embed-block .embed-body video{
+  max-width:100%;
+}
+.embed-block .embed-body *{
   max-width:100%;
 }
 
