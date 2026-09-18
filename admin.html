@@ -370,13 +370,21 @@
           <textarea name="embedCode" class="code" placeholder="&lt;iframe src=&quot;https://...&quot;&gt;&lt;/iframe&gt;">${escapeHtml(existing?.embedCode || '')}</textarea>
         </div>
         <p class="field-hint" data-field="embed-only" hidden>Paste the embed/iframe code a widget or video provider gives you (e.g. a weather station widget, a YouTube "Share → Embed" snippet). Only add embeds from providers you trust — this renders exactly as given, so it can include the provider's own scripts.</p>
-        <div class="field">
-          <label>Visible to</label>
-          <select name="audience">
-            <option value="all">Everyone</option>
-            <option value="student">Students only</option>
-            <option value="faculty">Faculty only</option>
-          </select>
+        <div class="field-row">
+          <div class="field">
+            <label>Section</label>
+            <select name="section">
+              ${sections.map(s => `<option value="${s.id}">${escapeHtml(s.icon || '🔗')} ${escapeHtml(s.name)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field">
+            <label>Visible to</label>
+            <select name="audience">
+              <option value="all">Everyone</option>
+              <option value="student">Students only</option>
+              <option value="faculty">Faculty only</option>
+            </select>
+          </div>
         </div>
         <div style="display:flex; justify-content:flex-end; gap:.6rem; margin-top:.6rem;">
           <button type="button" class="btn-ghost" data-act="cancel">Cancel</button>
@@ -387,6 +395,7 @@
 
     const form = overlay.querySelector('form');
     if (existing?.audience) form.audience.value = existing.audience;
+    form.section.value = existing?.sectionId || sectionId;
 
     let cardType = existingType;
     function applyTypeVisibility() {
@@ -429,14 +438,22 @@
               audience: form.audience.value,
               embedCode: '',
             };
-        if (mode === 'create') {
-          const list = cardsBySection[sectionId] || [];
+        const targetSectionId = form.section.value;
+        const movedToNewSection = mode === 'edit' && existing.sectionId !== targetSectionId;
+
+        if (mode === 'create' || movedToNewSection) {
+          const list = cardsBySection[targetSectionId] || [];
           const maxOrder = list.reduce((m, c) => Math.max(m, c.order || 0), 0);
-          await addDoc(collection(db, 'cards'), { ...payload, sectionId, order: maxOrder + 10 });
+          payload.sectionId = targetSectionId;
+          payload.order = maxOrder + 10;
+        }
+
+        if (mode === 'create') {
+          await addDoc(collection(db, 'cards'), payload);
           showToast('Card added.');
         } else {
           await updateDoc(doc(db, 'cards', id), payload);
-          showToast('Card updated.');
+          showToast(movedToNewSection ? 'Card moved.' : 'Card updated.');
         }
         overlay.remove();
       } catch (err) {
